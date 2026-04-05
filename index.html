@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Message Sender</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      background: #0f172a; /* clean dark */
+      font-family: 'Poppins', sans-serif;
+    }
+
+    .box {
+      background: #1e293b;
+      border: 1px solid #334155;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+    }
+
+    .input {
+      background: #0f172a;
+      border: 1px solid #334155;
+      color: #e2e8f0;
+    }
+
+    .input:focus {
+      outline: none;
+      border-color: #3b82f6;
+      box-shadow: 0 0 10px #3b82f6;
+    }
+
+    .btn {
+      background: #3b82f6;
+      transition: 0.2s;
+    }
+
+    .btn:hover {
+      background: #2563eb;
+      transform: scale(1.03);
+    }
+
+    .fade-in {
+      animation: fadeIn 0.3s ease forwards;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body class="flex items-center justify-center min-h-screen">
+
+  <!-- PASSWORD SCREEN -->
+  <div id="loginBox" class="box p-8 rounded-2xl w-[24rem] text-center">
+    <h1 class="text-2xl font-bold text-white mb-4">Enter Password</h1>
+    <input id="passwordInput" type="password" placeholder="Password..."
+      class="input w-full p-3 rounded-xl mb-4 text-center">
+
+    <button onclick="checkPassword()"
+      class="btn w-full py-3 rounded-xl text-white font-semibold">
+      Unlock
+    </button>
+
+    <p id="loginError" class="text-red-400 mt-3 hidden">Wrong password</p>
+  </div>
+
+  <!-- MAIN APP -->
+  <div id="appBox" class="box p-8 rounded-2xl w-[26rem] text-center hidden">
+    <h1 class="text-2xl font-bold text-white mb-2">Message Sender</h1>
+    <p class="text-gray-400 mb-5">Send a message or image</p>
+
+    <textarea id="message"
+      placeholder="Type or paste an image..."
+      class="input w-full p-3 rounded-xl resize-none h-28"></textarea>
+
+    <button id="sendBtn"
+      class="btn mt-5 w-full py-3 rounded-xl text-white font-semibold">
+      Send
+    </button>
+
+    <p id="response" class="mt-4 hidden font-semibold text-lg"></p>
+    <img id="preview" class="mt-5 hidden w-full rounded-xl fade-in" />
+  </div>
+
+  <script>
+    const PASSWORD = "76544";
+
+    function checkPassword() {
+      const input = document.getElementById("passwordInput").value;
+      const error = document.getElementById("loginError");
+
+      if (input === PASSWORD) {
+        document.getElementById("loginBox").classList.add("hidden");
+        document.getElementById("appBox").classList.remove("hidden");
+      } else {
+        error.classList.remove("hidden");
+      }
+    }
+
+    const webhookURL = "https://discord.com/api/webhooks/1489718575269810428/CjMNlg5GYO0MHyUEggOJv-YcF5yM9dPrBCXby6CahbqfxHT8fAbEDwwK0O49H14wv1fz";
+
+    const textarea = document.getElementById("message");
+    const preview = document.getElementById("preview");
+    const responseText = document.getElementById("response");
+    let pastedImageBlob = null;
+
+    document.addEventListener("paste", async (event) => {
+      const items = event.clipboardData.items;
+      for (let item of items) {
+        if (item.type.indexOf("image") !== -1) {
+          const blob = item.getAsFile();
+          pastedImageBlob = blob;
+          const url = URL.createObjectURL(blob);
+          preview.src = url;
+          preview.classList.remove("hidden");
+        }
+      }
+    });
+
+    async function uploadImage(blob) {
+      const formData = new FormData();
+      formData.append("file", blob);
+      const res = await fetch("https://file.io", {
+        method: "POST",
+        body: formData
+      });
+      const data = await res.json();
+      return data.link;
+    }
+
+    async function sendMessage() {
+      const msg = textarea.value.trim();
+
+      if (!msg && !pastedImageBlob) {
+        showResponse("Type a message or image", "#facc15");
+        return;
+      }
+
+      try {
+        let content = msg || "Image:";
+        let payload = { content };
+
+        if (pastedImageBlob) {
+          const imageURL = await uploadImage(pastedImageBlob);
+          payload.content += `\n${imageURL}`;
+        }
+
+        await fetch(webhookURL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+
+        showResponse("Message Sent", "#22c55e");
+        textarea.value = "";
+        preview.classList.add("hidden");
+        pastedImageBlob = null;
+      } catch (error) {
+        showResponse("Failed to Send", "#ef4444");
+      }
+    }
+
+    function showResponse(text, color) {
+      responseText.textContent = text;
+      responseText.style.color = color;
+      responseText.classList.remove("hidden");
+    }
+
+    textarea.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+
+    document.getElementById("sendBtn").addEventListener("click", sendMessage);
+  </script>
+</body>
+</html>
